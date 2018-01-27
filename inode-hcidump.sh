@@ -155,9 +155,9 @@ parse() {
   if [[ "${13}" != "D0" ]]; then
     return 1
   fi
-  if [[ "${12}" != "F0" ]]; then
-    return 1
-  fi
+  #if [[ "${12}" != "F0" ]]; then
+  #  return 1
+  #fi
 
   shift 7
   
