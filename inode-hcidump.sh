@@ -193,8 +193,18 @@ parse() {
   parse_data "$MAC" $PACKET
 }
 
-if [[ $# -ne 1 ]]; then
-  parse_data "user" "FF" "$@"
+echo $#
+
+split_into_2() {
+  for s; do
+    for (( i=0; i < ${#s}; i += 2 )); do 
+      echo ${s:$i:2}
+    done
+  done
+}
+
+if [[ $# -ne 0 ]]; then
+  parse_data "user" "FF" $(split_into_2 "$@")
   exit $?
 fi
 
