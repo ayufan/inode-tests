@@ -3,7 +3,7 @@
 #include <BLEScan.h>
 #include <BLEAdvertisedDevice.h>
 
-int scanTime = 5; //In seconds
+int scanTime = 5;
 
 struct iNodeMeter {
   unsigned short rawAvg;
@@ -107,7 +107,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
 void setup() {
   Serial.begin(115200);
   Serial.println("Scanning...");
-  
+
   BLEDevice::init("");
 }
 
