@@ -24,6 +24,19 @@ user: rawAvg=54 rawSum=484785 avg=2160W sum=323190Wh constant=1500 batteryLevel=
 
 Simple iNode Server Hub written in Go to be used with iNode USB adapters. _Currently supports only iNode USB LoRa adapter._
 
+### Binaries
+
+Download and run one of the binaries from `https://github.com/ayufan/inode-tests/releases/latest`.
+
+### Manual compliation
+
+Install Go language runtime and run from the terminal:
+
+```bash
+go get -v github.com/ayufan/inode-tests/inode-server
+inode-server
+```
+
 ## `esp32-emeter-analyze`
 
 This is a simple ESP32 app (using Arduino Core) that can be used to receive emeter BT data. Currently it is only decoding, but is very simple to extend: for example to add HTTP POST or MQTT.
