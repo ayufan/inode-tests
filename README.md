@@ -20,6 +20,10 @@ $ ./inode-hcidump.sh 90 82 36 00 b1 65 07 00 dc 05 c0 00 80
 user: rawAvg=54 rawSum=484785 avg=2160W sum=323190Wh constant=1500 batteryLevel=110% lightLevel=0% weekDayData=192 powerLevel= rssi=
 ```
 
+## `inode-server`
+
+Simple iNode Server Hub written in Go to be used with iNode USB adapters. _Currently supports only iNode USB LoRa adapter._
+
 ## `esp32-emeter-analyze`
 
 This is a simple ESP32 app (using Arduino Core) that can be used to receive emeter BT data. Currently it is only decoding, but is very simple to extend: for example to add HTTP POST or MQTT.
