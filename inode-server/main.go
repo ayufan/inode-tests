@@ -30,6 +30,7 @@ var devices = []device{
 }
 
 var baudRates = []int{
+	115200,
 	921600,
 }
 
