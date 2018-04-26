@@ -26,7 +26,7 @@ Simple iNode Server Hub written in Go to be used with iNode USB adapters. _Curre
 
 ### Binaries
 
-Download and run one of the binaries from `https://github.com/ayufan/inode-tests/releases/latest`.
+Download and run one of the binaries from https://github.com/ayufan/inode-tests/releases/latest.
 
 ### Manual compliation
 
