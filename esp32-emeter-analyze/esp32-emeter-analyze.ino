@@ -58,13 +58,23 @@ std::string parseiNodeMeter(unsigned char *data, size_t size) {
   return buffer;
 }
 
+bool isiNodeDevice(unsigned char *address) {
+  if (address[0] == 0x00 && address[1] == 0x0b && address[2] == 0x57) {
+    return true;
+  }
+  if (address[0] == 0xd0 && address[1] == 0xf0) {
+    return true;
+  }
+  return false;
+}
+
 std::string parseiNodeData(BLEAdvertisedDevice device) {
   if (!device.haveManufacturerData()) {
     return std::string("no manfacturer data");
   }
 
   auto deviceAddress = *device.getAddress().getNative();
-  if (deviceAddress[0] != 0xD0 || deviceAddress[1] != 0xF0) {
+  if (!isiNodeDevice(deviceAddress)) {
     return std::string("invalid address");
   }
 
@@ -74,7 +84,7 @@ std::string parseiNodeData(BLEAdvertisedDevice device) {
     return std::string("not enough data");
   }
 
-  if (data[0] != 0x90) {
+  if (data[0] != 0x90 && data[0] != 0xa0) {
     return std::string("not inode data");
   }
 
