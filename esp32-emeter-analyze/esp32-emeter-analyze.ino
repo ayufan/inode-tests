@@ -62,7 +62,7 @@ bool isiNodeDevice(unsigned char *address) {
   if (address[0] == 0x00 && address[1] == 0x0b && address[2] == 0x57) {
     return true;
   }
-  if (address[0] == 0xd0 && address[1] == 0xf0) {
+  if (address[0] == 0xd0 && address[1] == 0xf0 && address[2] == 0x18) {
     return true;
   }
   return false;
