@@ -40,10 +40,11 @@ batteryLevel() {
   elif [[ $batteryLevel -gt 11 ]]; then
     batteryLevel=0
   else
-    batteryLevel=$((10*battery-10))
+    batteryLevel=$(((battery-2)*10))
   fi
+  batteryVoltage=$((1800+batteryLevel*1200/100))
   
-  echo "$batteryLevel%"
+  echo "${batteryVoltage}mV"
 }
 
 lightLevel() {
@@ -123,7 +124,7 @@ parse_82() {
     "constant=$constant" \
     "batteryLevel=$(batteryLevel "$batteryAndLight")" \
     "lightLevel=$(lightLevel "$batteryAndLight")" \
-    "weekDayData=$batteryAndLight" \
+    "weekDayData=$weekDayData" \
     "powerLevel=$POWER_LEVEL" \
     "rssi=$RSSI"
 }
