@@ -1,6 +1,7 @@
 #!/bin/bash
 
 DIR=$(dirname "$0")
+DEVICE=${1:-hci0}
 
 if [ $(id -u) -ne 0 ]; then
   echo "$0: run as root"
@@ -8,5 +9,5 @@ if [ $(id -u) -ne 0 ]; then
 fi
 
 cd $DIR
-hcitool lescan --passive --duplicates &
-hcidump --raw | ./inode-hcidump.sh
+hcitool -i "$DEVICE" lescan --passive --duplicates &
+hcidump -i "$DEVICE" --raw | ./inode-hcidump.sh

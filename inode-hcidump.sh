@@ -144,7 +144,7 @@ parse_data() {
     82)
       parse_$TYPE "$MAC" "$@"
       ;;
-    
+
     *)
       echo "Unknown device."
       return 1
@@ -153,15 +153,14 @@ parse_data() {
 }
 
 parse() {
-  if [[ "${13}" != "D0" ]]; then
-    return 1
-  fi
-  if [[ "${12}" != "F0" ]]; then
-    return 1
+  if [[ "${13}" != "D0" ]] && [[ "${12}" != "F0" ]]; then
+    if [[ "${13}" != "00" ]] && [[ "${12}" != "0B" ]] && [[ "${11}" != "57" ]]; then
+      return 1
+   fi
   fi
 
   shift 7
-  
+ 
   local MAC=$(reversemerge ${@:1:6})
   MAC="${MAC,,}"
   shift 6
