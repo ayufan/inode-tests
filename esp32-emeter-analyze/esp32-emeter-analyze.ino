@@ -4,6 +4,7 @@
 #include <BLEAdvertisedDevice.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include <ArduinoOTA.h>
 
 #include "config.h"
 
@@ -39,10 +40,10 @@ std::string parseiNodeMeter(BLEAdvertisedDevice *device, unsigned char *data, si
     unsigned int rawSum;
     unsigned short constant : 14;
     unsigned short unit : 2;
-    unsigned char batteryLevel : 4;
     unsigned char lightLevel : 4;
-    unsigned short weekDay : 4;
+    unsigned char batteryLevel : 4;
     unsigned short weekDayTotal : 12;
+    unsigned short weekDay : 4;
   } __attribute__((packed));
 
   iNodeMeter *meter = (iNodeMeter*)data;
@@ -129,7 +130,7 @@ std::string parseiNodeData(BLEAdvertisedDevice *device) {
   }
 
   publishMqttInteger(device, "tx", "power", device->getTXPower());
-  publishMqttFloat(device, "rssi", "level", device->getRSSI());
+  publishMqttInteger(device, "rssi", "level", device->getRSSI());
 
   switch(data[1]) {
     case 0x82:
@@ -217,6 +218,9 @@ void setup() {
   
   WiFi.begin(ssid, password);
 
+  ArduinoOTA.setPassword(ota_password");
+  ArduinoOTA.begin();
+
 #ifdef ENABLE_BLUETOOTH
   BLEDevice::init("");
 #endif
@@ -229,7 +233,9 @@ void loop() {
     return;
   }
 
+  ArduinoOTA.handle();
   client.loop();
+
   bleScan();
 }
 
