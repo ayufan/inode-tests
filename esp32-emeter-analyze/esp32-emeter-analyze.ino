@@ -147,21 +147,47 @@ std::string parseiNodeData(BLEAdvertisedDevice *device) {
 }
 
 #ifdef ENABLE_BLUETOOTH
-class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
+class AdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
 {
-    void onResult(BLEAdvertisedDevice advertisedDevice)
-    {
-      auto parsed_data = parseiNodeData(&advertisedDevice);
-      if (parsed_data.empty()) {
-        parsed_data = "none";
-      }
-      
-      Serial.printf("Advertised Device: %s, RSSI: %d, parsed: %s\n",
-        advertisedDevice.toString().c_str(),
-        advertisedDevice.getRSSI(),
-        parsed_data.c_str());
+public:
+  void onResult(BLEAdvertisedDevice advertisedDevice)
+  {
+    mutex.take();
+    advertisements.push_back(advertisedDevice);
+    mutex.give();
+  }
+
+  void processAdvertisement(BLEAdvertisedDevice *advertisedDevice)
+  {
+    auto parsed_data = parseiNodeData(advertisedDevice);
+    if (parsed_data.empty()) {
+      parsed_data = "none";
     }
-};
+    
+    Serial.printf("Advertised Device: %s, RSSI: %d, parsed: %s\n",
+      advertisedDevice->toString().c_str(),
+      advertisedDevice->getRSSI(),
+      parsed_data.c_str());
+  }
+
+  void process()
+  {
+    int i;
+
+    mutex.take();
+    for (i = 0; i < advertisements.size(); ++i) {
+      BLEAdvertisedDevice advertisedDevice = advertisements[i];
+      mutex.give();
+      processAdvertisement(&advertisedDevice);
+      mutex.take();
+    }
+    advertisements.clear();
+    mutex.give();
+  }
+
+  std::vector<BLEAdvertisedDevice> advertisements;
+  FreeRTOS::Semaphore mutex;
+} advertisedDeviceCallbacks;
 #endif
 
 void connectWifi() {
@@ -179,41 +205,17 @@ void connectWifi() {
   Serial.println('\n');
 }
 
-bool connect() {
-  if (client.connected()) {
-    return true;
-  }
-
-  Serial.println("Waiting for WiFi...");
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.print("No WiFi=");
-    Serial.println(WiFi.status());
-    return false;
-  }
-
-  Serial.print("WiFi connnected established: ");
-  Serial.println(WiFi.localIP());
-
-  Serial.println("Connecting to MQTT...");
-
-  if (!client.connect(WiFi.macAddress().c_str(), mqtt_user, mqtt_password)) {
-    Serial.print("failed, rc=");
-    Serial.println(client.state());
-    return false;
-  }
-
-  Serial.println("MQTT connection established!"); 
-  return true;
-}
-
-void bleScan() {
+void bleScan(void *pvParameters) {
 #ifdef ENABLE_BLUETOOTH
+  BLEDevice::init("");
   BLEScan *pBLEScan = BLEDevice::getScan();
-  pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
+  pBLEScan->setAdvertisedDeviceCallbacks(&advertisedDeviceCallbacks, true);
   pBLEScan->setActiveScan(false);
-  BLEScanResults devices = pBLEScan->start(bluetooth_scan_time);
-  Serial.print("BLE scan completed: ");
-  Serial.println(devices.getCount());
+  pBLEScan->setInterval(bluetooth_scan_time * 1000);
+
+  while(1) {
+    pBLEScan->start(bluetooth_scan_time);
+  }
 #endif
 }
 
@@ -233,8 +235,35 @@ void setup() {
   ArduinoOTA.begin();
 
 #ifdef ENABLE_BLUETOOTH
-  BLEDevice::init("");
+  xTaskCreatePinnedToCore(bleScan, "bleScan", 4096, NULL, 1, NULL, 1);
 #endif
+}
+
+bool connect() {
+  if (client.connected()) {
+    return true;
+  }
+
+  Serial.print("Waiting for WiFi... ");
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.print("No WiFi=");
+    Serial.println(WiFi.status());
+    return false;
+  }
+
+  Serial.print("connnected established: ");
+  Serial.println(WiFi.localIP());
+
+  Serial.print("Connecting to MQTT... ");
+
+  if (!client.connect(WiFi.macAddress().c_str(), mqtt_user, mqtt_password)) {
+    Serial.print("failed, rc=");
+    Serial.println(client.state());
+    return false;
+  }
+
+  Serial.println("MQTT connection established!"); 
+  return true;
 }
 
 void loop() {
@@ -247,6 +276,10 @@ void loop() {
   ArduinoOTA.handle();
   client.loop();
 
-  bleScan();
+#ifdef ENABLE_BLUETOOTH
+  advertisedDeviceCallbacks.process();
+#endif
+
+  delay(100);
 }
 
