@@ -178,22 +178,25 @@ bool connect() {
     return true;
   }
 
-  Serial.print("Attempting WiFi and MQTT connection...");
+  Serial.println("Waiting for WiFi...");
   if (WiFi.status() != WL_CONNECTED) {
     Serial.print("No WiFi=");
-    Serial.print(WiFi.status());
+    Serial.println(WiFi.status());
     return false;
   }
+
+  Serial.print("WiFi connnected established: ");
+  Serial.println(WiFi.localIP());
+
+  Serial.println("Connecting to MQTT...");
 
   if (!client.connect(WiFi.macAddress().c_str(), mqtt_user, mqtt_password)) {
     Serial.print("failed, rc=");
-    Serial.print(client.state());
+    Serial.println(client.state());
     return false;
   }
 
-  Serial.println("Connection established!");  
-  Serial.print("IP address:\t");
-  Serial.println(WiFi.localIP());
+  Serial.println("MQTT connection established!"); 
   return true;
 }
 
