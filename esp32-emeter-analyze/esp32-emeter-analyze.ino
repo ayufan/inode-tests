@@ -15,7 +15,7 @@ void publishMqttString(BLEAdvertisedDevice *device, const char *key1, const char
   char topic[64];
   uint8_t *nativeAddress = *device->getAddress().getNative();
 
-  sprintf(topic, "/inode/tests/%02x%02x%02x%02x%02x%02x/%s/%s",
+  sprintf(topic, "/inode/%02x%02x%02x%02x%02x%02x/%s/%s",
     nativeAddress[0], nativeAddress[1], nativeAddress[2], nativeAddress[3], nativeAddress[4], nativeAddress[5],
     key1, key2);
   Serial.printf("<< %s = %s\n", topic, value);
@@ -80,20 +80,25 @@ std::string parseiNodeMeter(BLEAdvertisedDevice *device, unsigned char *data, si
   auto avg = 60 * unitMultiplier * (unsigned int)meter->rawAvg / constant;
   auto sum = unitMultiplier * (unsigned int)meter->rawSum / constant;
   auto batteryLevel = 10 * ((meter->batteryLevel < 11 ? meter->batteryLevel : 11) - 1);
-  auto batteryVoltage = (batteryLevel - 10) * 1.2 / 100 + 1.8;
+  auto batteryVoltage = batteryLevel * 1200 / 100 + 1800;
   auto lightLevel = meter->lightLevel * 100 / 15;
+
+  publishMqttInteger(device, "avg", "raw", meter->rawAvg);
+  publishMqttInteger(device, "avg", unitAvgName, avg);
+
+  publishMqttInteger(device, "total", "raw", meter->rawSum);
+  publishMqttInteger(device, "total", unitSumName, sum);
+
+  publishMqttInteger(device, "battery", "level", batteryLevel);
+  publishMqttFloat(device, "battery", "mV", batteryVoltage);
+
+  publishMqttInteger(device, "light", "level", lightLevel);
+
+  publishMqttInteger(device, "device", "constant", meter->constant);
+  publishMqttInteger(device, "device", "unit", meter->unit);
 
   char weekDay[4];
   sprintf(weekDay, "%1d", meter->weekDay);
-
-  publishMqttInteger(device, "raw", "avg", meter->rawAvg);
-  publishMqttInteger(device, "raw", "sum", meter->rawSum);
-  publishMqttInteger(device, "raw", "constant", meter->constant);
-  publishMqttInteger(device, "total", unitSumName, sum);
-  publishMqttInteger(device, "current", unitAvgName, avg);
-  publishMqttInteger(device, "battery", "level", batteryLevel);
-  publishMqttFloat(device, "battery", "voltage", batteryVoltage);
-  publishMqttInteger(device, "light", "level", lightLevel);
   publishMqttInteger(device, "weekDay", weekDay, meter->weekDayTotal);
 
   return "done";
@@ -129,8 +134,8 @@ std::string parseiNodeData(BLEAdvertisedDevice *device) {
     return std::string("not inode data");
   }
 
-  publishMqttInteger(device, "tx", "power", device->getTXPower());
-  publishMqttInteger(device, "rssi", "level", device->getRSSI());
+  publishMqttInteger(device, "device", "tx-power", device->getTXPower());
+  publishMqttInteger(device, "device", "rssi", device->getRSSI());
 
   switch(data[1]) {
     case 0x82:
@@ -214,11 +219,17 @@ void bleScan() {
 
 void setup() {
   Serial.begin(115200);
-  Serial.printf("ESP32 WiFi Mac Address = %s\n", WiFi.macAddress().c_str());
-  
   WiFi.begin(ssid, password);
 
-  ArduinoOTA.setPassword(ota_password");
+  char hostname[64];
+  uint8_t mac[6];
+  WiFi.macAddress(mac);
+  sprintf(hostname, "esp32-inode-%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+  Serial.printf("Device Hostname = %s\n", hostname);
+
+  ArduinoOTA.setHostname(hostname);
+  ArduinoOTA.setPassword(ota_password);
   ArduinoOTA.begin();
 
 #ifdef ENABLE_BLUETOOTH
