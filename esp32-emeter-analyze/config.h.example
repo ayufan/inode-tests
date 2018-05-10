@@ -2,6 +2,10 @@
 
 const char *ssid = "MyWiFi";
 const char *password = "MyWiFiPassword";
-const char *mqtt_server = "MyMQTTServer";
+
+const char *mqtt_server = "my-mqtt-server.home";
 const int mqtt_port = 1883;
+const char *mqtt_user = "";
+const char *mqtt_password = "";
+
 const int bluetooth_scan_time = 5;

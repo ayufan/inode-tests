@@ -185,7 +185,7 @@ bool connect() {
     return false;
   }
 
-  if (!client.connect(WiFi.macAddress().c_str())) {
+  if (!client.connect(WiFi.macAddress().c_str(), mqtt_user, mqtt_password)) {
     Serial.print("failed, rc=");
     Serial.print(client.state());
     return false;
