@@ -83,6 +83,9 @@ std::string parseiNodeMeter(BLEAdvertisedDevice *device, unsigned char *data, si
   auto batteryVoltage = batteryLevel * 1200 / 100 + 1800;
   auto lightLevel = meter->lightLevel * 100 / 15;
 
+  publishMqttInteger(device, "device", "constant", meter->constant);
+  publishMqttInteger(device, "device", "unit", meter->unit);
+
   publishMqttInteger(device, "avg", "raw", meter->rawAvg);
   publishMqttInteger(device, "avg", unitAvgName, avg);
 
@@ -93,9 +96,6 @@ std::string parseiNodeMeter(BLEAdvertisedDevice *device, unsigned char *data, si
   publishMqttFloat(device, "battery", "mV", batteryVoltage);
 
   publishMqttInteger(device, "light", "level", lightLevel);
-
-  publishMqttInteger(device, "device", "constant", meter->constant);
-  publishMqttInteger(device, "device", "unit", meter->unit);
 
   char weekDay[4];
   sprintf(weekDay, "%1d", meter->weekDay);
@@ -207,6 +207,13 @@ void connectWifi() {
 
 void bleScan(void *pvParameters) {
 #ifdef ENABLE_BLUETOOTH
+  // This method works, but it is not the best
+  // It leads to having high memory pressure
+  // as BLEScan, performs O(n) search on array and adds data to an array
+  // we also add all received advertisements to process them in main loop()
+  // it is possible, that if a lot of advertisements are received
+  // the device will run out of the memory
+
   BLEDevice::init("");
   BLEScan *pBLEScan = BLEDevice::getScan();
   pBLEScan->setAdvertisedDeviceCallbacks(&advertisedDeviceCallbacks, true);
