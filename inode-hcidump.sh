@@ -36,20 +36,21 @@ rawdecneg() {
 batteryLevel() {
   local battery=$(($1/16))
   if [[ $battery -eq 1 ]]; then
-    batteryLevel=100
+    echo 100
   elif [[ $batteryLevel -gt 11 ]]; then
-    batteryLevel=0
+    echo 0
   else
-    batteryLevel=$(((battery-2)*10))
+    echo $(((battery-2)*10))
   fi
-  batteryVoltage=$((1800+batteryLevel*1200/100))
-  
-  echo "${batteryVoltage}mV"
+}
+
+batteryVoltage() {
+  echo $((1800+$(batteryLevel "$@")*1200/100))
 }
 
 lightLevel() {
   local lightLevel=$((($1%16)*100/15))
-  echo "$lightLevel%"
+  echo "$lightLevel"
 }
 
 send_mqtt() {
@@ -107,14 +108,21 @@ parse_82() {
   weekDayData=$(rawdec "${@:1:2}")
   shift 2
 
-  send_mqtt "/inode/$MAC/raw/avg" "$rawAvg"
-  send_mqtt "/inode/$MAC/raw/sum" "$rawSum"
-  send_mqtt "/inode/$MAC/batteryLevel" "$(batteryLevel "$batteryAndLight")"
-  send_mqtt "/inode/$MAC/lightLevel" "$(lightLevel "$batteryAndLight")"
+  send_mqtt "/inode/$MAC/avg/raw" "$rawAvg"
+  send_mqtt "/inode/$MAC/avg/$unitSumName" "$sum"
+
+  send_mqtt "/inode/$MAC/total/raw" "$rawSum"
   send_mqtt "/inode/$MAC/total/$unitAvgName" "$avg"
-  send_mqtt "/inode/$MAC/current/$unitSumName" "$sum"
-  send_mqtt "/inode/$MAC/powerLevel" "$POWER_LEVEL"
-  send_mqtt "/inode/$MAC/rssiLevel" "$RSSI"
+
+  send_mqtt "/inode/$MAC/battery/level" "$(batteryLevel "$batteryAndLight")"
+  send_mqtt "/inode/$MAC/battery/mV" "$(batteryVoltage "$batteryAndLight")"
+
+  send_mqtt "/inode/$MAC/light/level" "$(lightLevel "$batteryAndLight")"
+
+  send_mqtt "/inode/$MAC/device/constant" "$constant"
+  send_mqtt "/inode/$MAC/device/unit" "$unit"
+  send_mqtt "/inode/$MAC/device/tx-power" "$POWER_LEVEL"
+  send_mqtt "/inode/$MAC/device/rssi" "$RSSI"
 
   echo "$MAC:" \
     "rawAvg=$rawAvg" \
@@ -123,7 +131,7 @@ parse_82() {
     "sum=$sum$unitSumName" \
     "constant=$constant" \
     "batteryLevel=$(batteryLevel "$batteryAndLight")" \
-    "lightLevel=$(lightLevel "$batteryAndLight")" \
+    "lightLevel=$(lightLevel "$batteryAndLight")%" \
     "weekDayData=$weekDayData" \
     "powerLevel=$POWER_LEVEL" \
     "rssi=$RSSI"
