@@ -148,10 +148,68 @@ std::string parseiNodeData(BLEAdvertisedDevice *device) {
   }
 }
 
-#ifdef ENABLE_BLUETOOTH
-class AdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
+class BluetoothScanner : public BLEAdvertisedDeviceCallbacks
 {
 public:
+  BluetoothScanner()
+  {
+    enabled = true;
+  }
+
+  static void scannerTask(void *data)
+  {
+    BluetoothScanner *scanner = (BluetoothScanner*)data;
+
+    // This method works, but it is not the best
+    // It leads to having high memory pressure
+    // as BLEScan, performs O(n) search on array and adds data to an array
+    // we also add all received advertisements to process them in main loop()
+    // it is possible, that if a lot of advertisements are received
+    // the device will run out of the memory
+
+    BLEDevice::init("");
+    BLEScan *pBLEScan = BLEDevice::getScan();
+    pBLEScan->setAdvertisedDeviceCallbacks(scanner, true);
+    pBLEScan->setActiveScan(false);
+    pBLEScan->setInterval(100/0.625); // maximum allowed scan interval
+    pBLEScan->setWindow(100/0.625); // maximum allowed scan interval
+
+    while(1) {
+      if (scanner->enabled) {
+        pBLEScan->start(bluetooth_scan_time);
+      } else {
+        delay(1000);
+      }
+    }
+  }
+
+  void resume()
+  {
+    enabled = true;
+  }
+
+  void pause()
+  {
+    enabled = false;
+    BLEDevice::getScan()->stop();
+  }
+
+  void process()
+  {
+    int i;
+
+    mutex.take();
+    for (i = 0; i < advertisements.size(); ++i) {
+      BLEAdvertisedDevice advertisedDevice = advertisements[i];
+      mutex.give();
+      processAdvertisement(&advertisedDevice);
+      mutex.take();
+    }
+    advertisements.clear();
+    mutex.give();
+  }
+
+private:
   void onResult(BLEAdvertisedDevice advertisedDevice)
   {
     mutex.take();
@@ -172,24 +230,13 @@ public:
       parsed_data.c_str());
   }
 
-  void process()
-  {
-    int i;
-
-    mutex.take();
-    for (i = 0; i < advertisements.size(); ++i) {
-      BLEAdvertisedDevice advertisedDevice = advertisements[i];
-      mutex.give();
-      processAdvertisement(&advertisedDevice);
-      mutex.take();
-    }
-    advertisements.clear();
-    mutex.give();
-  }
-
   std::vector<BLEAdvertisedDevice> advertisements;
   FreeRTOS::Semaphore mutex;
-} advertisedDeviceCallbacks;
+  bool enabled;
+};
+
+#ifdef ENABLE_BLUETOOTH
+BluetoothScanner bluetoothScanner;
 #endif
 
 void connectWifi() {
@@ -207,28 +254,6 @@ void connectWifi() {
   Serial.println('\n');
 }
 
-void bleScan(void *pvParameters) {
-#ifdef ENABLE_BLUETOOTH
-  // This method works, but it is not the best
-  // It leads to having high memory pressure
-  // as BLEScan, performs O(n) search on array and adds data to an array
-  // we also add all received advertisements to process them in main loop()
-  // it is possible, that if a lot of advertisements are received
-  // the device will run out of the memory
-
-  BLEDevice::init("");
-  BLEScan *pBLEScan = BLEDevice::getScan();
-  pBLEScan->setAdvertisedDeviceCallbacks(&advertisedDeviceCallbacks, true);
-  pBLEScan->setActiveScan(false);
-  pBLEScan->setInterval(30/0.625); // maximum allowed scan interval
-  pBLEScan->setWindow(30/0.625); // maximum allowed scan interval
-
-  while(1) {
-    pBLEScan->start(bluetooth_scan_time);
-  }
-#endif
-}
-
 void setup() {
   Serial.begin(115200);
   WiFi.begin(ssid, password);
@@ -244,12 +269,45 @@ void setup() {
   esp_err_t err = esp_coex_preference_set(ESP_COEX_PREFER_BT);
   Serial.printf("esp_coex_preference_set: %d\n", err);
 
+  ArduinoOTA
+    .onStart([]() {
+      String type;
+      if (ArduinoOTA.getCommand() == U_FLASH)
+        type = "sketch";
+      else // U_SPIFFS
+        type = "filesystem";
+
+      // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+      Serial.println("Start updating " + type);
+#ifdef ENABLE_BLUETOOTH
+      bluetoothScanner.pause();
+#endif
+    })
+    .onEnd([]() {
+      Serial.println("\nEnd");
+#ifdef ENABLE_BLUETOOTH
+      bluetoothScanner.resume();
+#endif
+    })
+    .onProgress([](unsigned int progress, unsigned int total) {
+      Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    })
+    .onError([](ota_error_t error) {
+      Serial.printf("Error[%u]: ", error);
+      if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+      else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+      else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+      else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+      else if (error == OTA_END_ERROR) Serial.println("End Failed");
+    });
+
+
   ArduinoOTA.setHostname(hostname);
   ArduinoOTA.setPassword(ota_password);
   ArduinoOTA.begin();
 
 #ifdef ENABLE_BLUETOOTH
-  xTaskCreatePinnedToCore(bleScan, "bleScan", 4096, NULL, 1, NULL, 1);
+  FreeRTOS::startTask(BluetoothScanner::scannerTask, "bluetoothScanner", &bluetoothScanner);
 #endif
 }
 
@@ -291,9 +349,9 @@ void loop() {
   client.loop();
 
 #ifdef ENABLE_BLUETOOTH
-  advertisedDeviceCallbacks.process();
+  bluetoothScanner.process();
 #endif
 
-  delay(2000);
+  delay(5);
 }
 
