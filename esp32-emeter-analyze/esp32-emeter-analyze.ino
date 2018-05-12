@@ -5,6 +5,7 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoOTA.h>
+#include <esp_coexist.h>
 
 #include "config.h"
 
@@ -134,6 +135,7 @@ std::string parseiNodeData(BLEAdvertisedDevice *device) {
     return std::string("not inode data");
   }
 
+  publishMqttString(device, "device", "name", device->getName().c_str());
   publishMqttInteger(device, "device", "tx-power", device->getTXPower());
   publishMqttInteger(device, "device", "rssi", device->getRSSI());
 
@@ -218,7 +220,8 @@ void bleScan(void *pvParameters) {
   BLEScan *pBLEScan = BLEDevice::getScan();
   pBLEScan->setAdvertisedDeviceCallbacks(&advertisedDeviceCallbacks, true);
   pBLEScan->setActiveScan(false);
-  pBLEScan->setInterval(bluetooth_scan_time * 1000);
+  pBLEScan->setInterval(30/0.625); // maximum allowed scan interval
+  pBLEScan->setWindow(30/0.625); // maximum allowed scan interval
 
   while(1) {
     pBLEScan->start(bluetooth_scan_time);
@@ -235,7 +238,11 @@ void setup() {
   WiFi.macAddress(mac);
   sprintf(hostname, "esp32-inode-%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
+  Serial.printf("Compiled: %s %s\n", __DATE__, __TIME__);
   Serial.printf("Device Hostname = %s\n", hostname);
+
+  esp_err_t err = esp_coex_preference_set(ESP_COEX_PREFER_BT);
+  Serial.printf("esp_coex_preference_set: %d\n", err);
 
   ArduinoOTA.setHostname(hostname);
   ArduinoOTA.setPassword(ota_password);
@@ -287,6 +294,6 @@ void loop() {
   advertisedDeviceCallbacks.process();
 #endif
 
-  delay(100);
+  delay(2000);
 }
 
