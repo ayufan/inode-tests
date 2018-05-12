@@ -105,7 +105,12 @@ std::string parseiNodeMeter(BLEAdvertisedDevice *device, unsigned char *data, si
   return "done";
 }
 
-bool isiNodeDevice(unsigned char *address) {
+bool isiNodeDevice(BLEAdvertisedDevice *device) {
+  if (!device->haveManufacturerData()) {
+    return false;
+  }
+  
+  auto address = *device->getAddress().getNative();
   if (address[0] == 0x00 && address[1] == 0x0b && address[2] == 0x57) {
     return true;
   }
@@ -116,12 +121,7 @@ bool isiNodeDevice(unsigned char *address) {
 }
 
 std::string parseiNodeData(BLEAdvertisedDevice *device) {
-  if (!device->haveManufacturerData()) {
-    return std::string("no manfacturer data");
-  }
-
-  auto deviceAddress = *device->getAddress().getNative();
-  if (!isiNodeDevice(deviceAddress)) {
+  if (!isiNodeDevice(device)) {
     return std::string("invalid address");
   }
 
@@ -171,8 +171,8 @@ public:
     BLEScan *pBLEScan = BLEDevice::getScan();
     pBLEScan->setAdvertisedDeviceCallbacks(scanner, true);
     pBLEScan->setActiveScan(false);
-    pBLEScan->setInterval(100/0.625); // maximum allowed scan interval
-    pBLEScan->setWindow(100/0.625); // maximum allowed scan interval
+    pBLEScan->setInterval(100/0.625);
+    pBLEScan->setWindow(90/0.625);
 
     while(1) {
       if (scanner->enabled) {
@@ -212,8 +212,19 @@ public:
 private:
   void onResult(BLEAdvertisedDevice advertisedDevice)
   {
+    if (!isiNodeDevice(&advertisedDevice)) {
+      Serial.printf("Advertised Device: %s, RSSI: %d => is not iNode Device\n",
+        advertisedDevice.toString().c_str(),
+        advertisedDevice.getRSSI());
+      return;
+    }
+    
     mutex.take();
-    advertisements.push_back(advertisedDevice);
+    if (advertisements.size() < 20) {
+      advertisements.push_back(advertisedDevice);
+    } else {
+      Serial.println("Too many advertisements received. Dropping\n");
+    }
     mutex.give();
   }
 
@@ -223,7 +234,7 @@ private:
     if (parsed_data.empty()) {
       parsed_data = "none";
     }
-    
+
     Serial.printf("Advertised Device: %s, RSSI: %d, parsed: %s\n",
       advertisedDevice->toString().c_str(),
       advertisedDevice->getRSSI(),
@@ -306,42 +317,53 @@ void setup() {
   ArduinoOTA.setPassword(ota_password);
   ArduinoOTA.begin();
 
-#ifdef ENABLE_BLUETOOTH
-  FreeRTOS::startTask(BluetoothScanner::scannerTask, "bluetoothScanner", &bluetoothScanner);
-#endif
-}
-
-bool connect() {
-  if (client.connected()) {
-    return true;
-  }
-
-  Serial.print("Waiting for WiFi... ");
-  if (WiFi.status() != WL_CONNECTED) {
+  int i = 0;
+  Serial.println("Waiting for WiFi... ");
+  while (WiFi.status() != WL_CONNECTED) {
+    if (i++ > 30) {
+      Serial.println("Failed to connect to WiFi. Reboot\n");
+      ESP.restart();
+      return;
+    }
     Serial.print("No WiFi=");
     Serial.println(WiFi.status());
-    return false;
+    delay(1000);
   }
 
   Serial.print("connnected established: ");
   Serial.println(WiFi.localIP());
 
-  Serial.print("Connecting to MQTT... ");
+  i = 0;
+  Serial.println("Connecting to MQTT... ");
+  while (!client.connect(WiFi.macAddress().c_str(), mqtt_user, mqtt_password)) {
+    if (i++ > 30) {
+      Serial.println("Failed to connect to MQTT. Reboot\n");
+      ESP.restart();
+      return;
+    }
 
-  if (!client.connect(WiFi.macAddress().c_str(), mqtt_user, mqtt_password)) {
     Serial.print("failed, rc=");
     Serial.println(client.state());
-    return false;
+    delay(1000);
   }
 
   Serial.println("MQTT connection established!"); 
-  return true;
+
+#ifdef ENABLE_BLUETOOTH
+  FreeRTOS::startTask(BluetoothScanner::scannerTask, "bluetoothScanner", &bluetoothScanner);
+#endif
 }
 
 void loop() {
-  if (!connect()) {
-    Serial.println(" try again in 1 seconds");
-    delay(1000);
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("No WiFi connection. Reboot");
+    ESP.restart();
+    return;
+  }
+
+  if (client.connected()) {
+    Serial.println("No MQTT connection. Reboot");
+    ESP.restart();
     return;
   }
 
