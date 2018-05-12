@@ -361,7 +361,7 @@ void loop() {
     return;
   }
 
-  if (client.connected()) {
+  if (!client.connected()) {
     Serial.println("No MQTT connection. Reboot");
     ESP.restart();
     return;
