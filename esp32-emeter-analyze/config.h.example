@@ -32,4 +32,4 @@ const int lora_pin_di0 = 26;
 const int oled_address = 0x3c;
 const int oled_pin_sda = 21;
 const int oled_pin_scl = 22;
-const int oled_pin_reset = -1;
+const int oled_pin_reset = 16;
