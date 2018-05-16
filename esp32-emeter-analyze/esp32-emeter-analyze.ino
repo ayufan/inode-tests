@@ -379,14 +379,17 @@ String receiveLoRa(const String &packet) {
     return "too small packet";
   }
 
-  unsigned char payloadSize = (unsigned char)packet[0];
+  unsigned char *dataStart = (unsigned char *)packet.c_str();
+  unsigned char *dataEnd = dataStart + packet.length();
+
+  unsigned char payloadSize = *dataStart;
   if (packet.length() != payloadSize + 2) {
     return "invalid size";
   }
 
   deviceData data;
-  data.address = bytesToHex((unsigned char*)packet.c_str() + 2, 5);
-  data.payload = bytesToString((unsigned char*)packet.c_str() + 7, packet.length() - 7);
+  data.address = bytesToHex(dataStart + 2, 3);
+  data.payload = bytesToString(dataStart + 7, packet.length() - 7);
   data.rssi = LoRa.packetRssi();
   data.snr = LoRa.packetSnr();
   data.freqError = LoRa.packetFrequencyError();
@@ -543,14 +546,12 @@ void updateDisplay() {
 void refreshDisplay() {
   display.clear();
   display.setFont(ArialMT_Plain_10);
-  display.setTextAlignment(TEXT_ALIGN_RIGHT);
-  display.drawString(10, 128, String(millis()));
   display.setTextAlignment(TEXT_ALIGN_LEFT);
   for(int i = 0, line = 0; i < sizeof(lines)/sizeof(lines[0]); ++i) {
     if (lines[i].length() == 0) {
       continue;
     }
-    display.drawString(0, 19 * line++, lines[i]);
+    display.drawStringMaxWidth(0, 13 * line++, 128, lines[i]);
   }
   display.display();
 }
