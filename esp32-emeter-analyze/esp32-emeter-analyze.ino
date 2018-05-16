@@ -65,6 +65,15 @@ String bytesToHex(const unsigned char *data, int size) {
   return output;
 }
 
+String bytesToString(const unsigned char *data, int size) {
+  String output;
+  output.reserve(size);
+  for (int i = 0; i < size; ++i) {
+    output += (char)data[i];
+  }
+  return output;
+}
+
 struct deviceData {
   String name;
   String address;
@@ -81,34 +90,20 @@ struct deviceData {
     freqError = -1;
   }
 
-  bool isiNode() const {
-    if (!payload.length())
-      return false;
-    if (strstr(address.c_str(), "000b57") == address.c_str())
-      return true;
-    if (strstr(address.c_str(), "d0f018") == address.c_str())
-      return true;
-    return false;
-  }
-
   String rawData() const {
     return bytesToHex((const unsigned char*)payload.c_str(), payload.length());
   }
 
   String publish() {
-    if (!isiNode()) {
-      return "invalid address";
-    }
-  
-    auto data = (unsigned char*)payload.c_str();
     if (payload.length() < 3) {
       return "not enough data";
     }
 
+    auto data = (unsigned char*)payload.c_str();
     if (data[0] != 0x90 && data[0] != 0xa0) {
       return "not inode data";
     }
-  
+ 
     publishMqttString(address.c_str(), "device", "name", name.c_str());
     if (txPower >= 0)
       publishMqttInteger(address.c_str(), "device", "tx-power", txPower);
@@ -268,6 +263,14 @@ private:
     return output;
   }
 
+  bool isiNode(const char *address) const {
+    if (strstr(address, "000b57") == address.c_str())
+      return true;
+    if (strstr(address, "d0f018") == address.c_str())
+      return true;
+    return false;
+  }
+
   void onResult(BLEAdvertisedDevice advertisedDevice) {
     deviceData data;
     data.address = bytesToHex(*advertisedDevice.getAddress().getNative(), 6);
@@ -276,7 +279,7 @@ private:
     data.rssi = advertisedDevice.getRSSI();
     data.txPower = advertisedDevice.getTXPower();
 
-    if (!data.isiNode()) {
+    if (!isiNode(data.address.c_str())) {
       Serial.printf("Advertised Device: %s, RSSI: %d => is not iNode Device\n",
         advertisedDevice.toString().c_str(),
         advertisedDevice.getRSSI());
@@ -292,8 +295,7 @@ private:
     mutex.give();
   }
 
-  void processAdvertisement(deviceData *data)
-  {
+  void processAdvertisement(deviceData *data) {
     data->publish();
   }
 
@@ -342,20 +344,48 @@ static void otaError(ota_error_t error) {
 #endif
 
 #ifdef ENABLE_LORA
+String receiveLoRa(const String &packet) {
+  if (packet.length() < 7) {
+    return "too small packet";
+  }
+
+  unsigned short *payload = (unsigned short*)packet.c_str();
+  unsigned short payloadSize = *payload;
+  if (packet.length() != payloadSize + 2) {
+    return "invalid size";
+  }
+
+  deviceData data;
+  data.address = bytesToHex((unsigned char*)packet.c_str() + 2, 5);
+  data.payload = bytesToString((unsigned char*)packet.c_str() + 7, packet.length() - 7);
+  data.rssi = LoRa.packetRssi();
+  data.snr = LoRa.packetSnr();
+  data.freqError = LoRa.packetFrequencyError();
+  return data.publish();
+}
+
+void parseLoRa(int packetSize) {
+  String output;
+  output.reserve(packetSize);
+  while (LoRa.available()) {
+    output += (char)LoRa.read();
+  }
+
+  Serial.println();
+  Serial.println("LoRa Message: " + bytesToHex((unsigned char*)output.c_str(), output.length()));
+  Serial.println("LoRa Packet Size: " + String(packetSize));
+  Serial.println("LoRa RSSI: " + String(LoRa.packetRssi()));
+  Serial.println("LoRa Snr: " + String(LoRa.packetSnr()));
+  Serial.println("LoRa Freq: " + String(LoRa.packetFrequencyError()));
+  String result = receiveLoRa(output);
+  Serial.println("LoRa Result: " + result);
+  Serial.println();
+}
+
 void processLoRa() {
   int packetSize = LoRa.parsePacket();
   if (packetSize) {
-    Serial.print("LoRa Message: ");
-    while (LoRa.available()) {
-      int data = LoRa.read();
-      Serial.printf("%02x", data & 0xFF);
-    }
-  
-    Serial.println();
-    Serial.println("LoRa Packet Size: " + String(packetSize));
-    Serial.println("LoRa RSSI: " + String(LoRa.packetRssi()));
-    Serial.println("LoRa Snr: " + String(LoRa.packetSnr()));
-    Serial.println();
+    parseLoRa(packetSize);
   }
 }
 #endif

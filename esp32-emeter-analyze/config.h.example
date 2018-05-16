@@ -20,7 +20,7 @@ const int bluetooth_scan_time = 5;
 const int lora_band = 869525e3;
 const int lora_sf = 12;
 const int lora_bw = 500e3;
-const int lora_cr = 1;
+const int lora_cr = 4;
 
 const int lora_pin_sck = 5;
 const int lora_pin_miso = 19;
