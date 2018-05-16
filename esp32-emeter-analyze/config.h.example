@@ -1,4 +1,7 @@
 #define ENABLE_BLUETOOTH
+#define ENABLE_LORA
+#define ENABLE_OLED
+#define ENABLE_OTA
 
 const char *ssid = "MyWiFi";
 const char *password = "MyWiFiPassword";

@@ -1,13 +1,19 @@
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <esp_coexist.h>
+
+#include "config.h"
+
+#ifdef ENABLE_BLUETOOTH
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEScan.h>
 #include <BLEAdvertisedDevice.h>
-#include <WiFi.h>
-#include <PubSubClient.h>
-#include <ArduinoOTA.h>
-#include <esp_coexist.h>
+#endif
 
-#include "config.h"
+#ifdef ENABLE_OTA
+#include <ArduinoOTA.h>
+#endif
 
 WiFiClient espClient;
 PubSubClient client(mqtt_server, mqtt_port, espClient);
@@ -148,6 +154,7 @@ std::string parseiNodeData(BLEAdvertisedDevice *device) {
   }
 }
 
+#ifdef ENABLE_BLUETOOTH
 class BluetoothScanner : public BLEAdvertisedDeviceCallbacks
 {
 public:
@@ -246,7 +253,6 @@ private:
   bool enabled;
 };
 
-#ifdef ENABLE_BLUETOOTH
 BluetoothScanner bluetoothScanner;
 #endif
 
@@ -280,6 +286,7 @@ void setup() {
   esp_err_t err = esp_coex_preference_set(ESP_COEX_PREFER_BT);
   Serial.printf("esp_coex_preference_set: %d\n", err);
 
+#ifdef ENABLE_OTA
   ArduinoOTA
     .onStart([]() {
       String type;
@@ -316,6 +323,7 @@ void setup() {
   ArduinoOTA.setHostname(hostname);
   ArduinoOTA.setPassword(ota_password);
   ArduinoOTA.begin();
+#endif
 
   int i = 0;
   Serial.println("Waiting for WiFi... ");
@@ -367,8 +375,11 @@ void loop() {
     return;
   }
 
-  ArduinoOTA.handle();
   client.loop();
+
+#ifdef ENABLE_OTA
+  ArduinoOTA.handle();
+#endif
 
 #ifdef ENABLE_BLUETOOTH
   bluetoothScanner.process();
@@ -376,4 +387,3 @@ void loop() {
 
   delay(5);
 }
-
