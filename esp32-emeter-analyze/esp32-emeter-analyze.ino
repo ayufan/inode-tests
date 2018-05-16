@@ -282,9 +282,9 @@ private:
   }
 
   bool isiNode(const char *address) const {
-    if (strstr(address, "000b57") == address.c_str())
+    if (strstr(address, "000b57") == address)
       return true;
-    if (strstr(address, "d0f018") == address.c_str())
+    if (strstr(address, "d0f018") == address)
       return true;
     return false;
   }
