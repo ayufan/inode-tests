@@ -379,8 +379,7 @@ String receiveLoRa(const String &packet) {
     return "too small packet";
   }
 
-  unsigned short *payload = (unsigned short*)packet.c_str();
-  unsigned short payloadSize = *payload;
+  unsigned char payloadSize = (unsigned char)packet[0];
   if (packet.length() != payloadSize + 2) {
     return "invalid size";
   }
@@ -428,7 +427,7 @@ void setup() {
   Serial.println("Starting OLED...");
 
   if (oled_pin_reset >= 0) {
-    pinMode(oled_pin_reset,OUTPUT);
+    pinMode(oled_pin_reset, OUTPUT);
     digitalWrite(oled_pin_reset, LOW);
     delay(50); 
     digitalWrite(oled_pin_reset, HIGH);
@@ -543,7 +542,7 @@ void updateDisplay() {
 
 void refreshDisplay() {
   display.clear();
-  display.setFont(ArialMT_Plain_16);
+  display.setFont(ArialMT_Plain_10);
   display.setTextAlignment(TEXT_ALIGN_RIGHT);
   display.drawString(10, 128, String(millis()));
   display.setTextAlignment(TEXT_ALIGN_LEFT);
