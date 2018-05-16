@@ -32,6 +32,19 @@ PubSubClient mqttClient(mqtt_server, mqtt_port, espClient);
 #endif
 #endif
 
+#ifdef ENABLE_OLED
+enum lineNames {
+  DeviceStatus,
+  WiFiStatus,
+  OTAStatus,
+  iNodeStatus,
+  iNodeDataStatus,
+  lineCount
+};
+
+String lines[lineCount];
+#endif
+
 void publishMqttString(const char *device, const char *key1, const char *key2, const char *value) {
   char topic[64];
 
@@ -190,6 +203,11 @@ struct deviceData {
     sprintf(weekDay, "%1d", meter->weekDay);
     publishMqttInteger(address.c_str(), "weekDay", weekDay, meter->weekDayTotal);
 
+#ifdef ENABLE_OLED
+    lines[iNodeStatus] = String("Emeter ") + address + "(" + rssi + "dBm";
+    lines[iNodeDataStatus] = String("Current: ") + avg + "W; Total: " + sum + "kW/h";
+#endif
+
     return "done";
   }
 };
@@ -320,6 +338,9 @@ static void otaStart() {
 #ifdef ENABLE_BLUETOOTH
   bluetoothScanner.pause();
 #endif
+#ifdef ENABLE_OLED
+  lines[OTAStatus] = String("Starting updating ") + type + "...";
+#endif
 }
 
 static void otaEnd() {
@@ -327,10 +348,16 @@ static void otaEnd() {
 #ifdef ENABLE_BLUETOOTH
   bluetoothScanner.resume();
 #endif
+#ifdef ENABLE_OLED
+  lines[OTAStatus] = "";
+#endif
 }
 
 static void otaProgress(unsigned int progress, unsigned int total) {
   Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+#ifdef ENABLE_OLED
+  lines[OTAStatus] = String("OTA Progress: ") + (progress / (total / 100)) + "%";
+#endif
 }
 
 static void otaError(ota_error_t error) {
@@ -340,6 +367,9 @@ static void otaError(ota_error_t error) {
   else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
   else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
   else if (error == OTA_END_ERROR) Serial.println("End Failed");
+#ifdef ENABLE_OLED
+  lines[OTAStatus] = String("OTA Error: ") + error;
+#endif
 }
 #endif
 
@@ -396,13 +426,16 @@ void setup() {
 
 #ifdef ENABLE_OLED
   Serial.println("Starting OLED...");
+
+  if (oled_pin_reset >= 0) {
+    pinMode(oled_pin_reset,OUTPUT);
+    digitalWrite(oled_pin_reset, LOW);
+    delay(50); 
+    digitalWrite(oled_pin_reset, HIGH);
+  }
+
   display.init();
   display.flipScreenVertically();
-  display.setFont(ArialMT_Plain_10);
-  display.setTextAlignment(TEXT_ALIGN_LEFT);
-  display.drawString(40, 40, "LoRa Sender");
-  display.displayOn();
-  display.display();
 #endif
 
 #ifdef ENABLE_LORA
@@ -431,7 +464,8 @@ void setup() {
   uint8_t mac[6];
   WiFi.macAddress(mac);
   sprintf(hostname, "esp32-inode-%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-  Serial.printf("Device Hostname = %s\n", hostname);
+  Serial.printf("Hostname = %s\n", hostname);
+  lines[DeviceStatus] = String("Device: ") + hostname;
 
   int i = 0;
   Serial.println("Waiting for WiFi... ");
@@ -482,6 +516,47 @@ void setup() {
 #endif
 }
 
+#ifdef ENABLE_OLED
+void updateDisplay() {
+  lines[WiFiStatus] = "";
+
+#ifdef ENABLE_BLUETOOTH
+  lines[WiFiStatus] += "BT ";
+#endif
+
+#ifdef ENABLE_LORA
+  lines[WiFiStatus] += "LoRa ";
+#endif
+
+#ifdef ENABLE_WIFI
+  lines[WiFiStatus] += String("WiFi(") + WiFi.status() + ") ";
+#endif
+
+#ifdef ENABLE_WIFI_MQTT
+  lines[WiFiStatus] += String("MQTT(") + mqttClient.connected() + ") ";
+#endif
+
+#ifdef ENABLE_WIFI_OTA
+  lines[WiFiStatus] += String("OTA ");
+#endif
+}
+
+void refreshDisplay() {
+  display.clear();
+  display.setFont(ArialMT_Plain_16);
+  display.setTextAlignment(TEXT_ALIGN_RIGHT);
+  display.drawString(10, 128, String(millis()));
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  for(int i = 0, line = 0; i < sizeof(lines)/sizeof(lines[0]); ++i) {
+    if (lines[i].length() == 0) {
+      continue;
+    }
+    display.drawString(0, 19 * line++, lines[i]);
+  }
+  display.display();
+}
+#endif
+
 void loop() {
 #ifdef ENABLE_WIFI
   if (WiFi.status() != WL_CONNECTED) {
@@ -511,6 +586,11 @@ void loop() {
 
 #ifdef ENABLE_LORA
   processLoRa();
+#endif
+
+#ifdef ENABLE_OLED
+  updateDisplay();
+  refreshDisplay();
 #endif
 
   delay(5);
