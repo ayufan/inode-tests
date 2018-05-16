@@ -4,6 +4,16 @@
 
 #include "config.h"
 
+#ifdef ENABLE_OLED
+#include <SSD1306.h>
+
+//OLED pins to ESP32 GPIOs via this connecthin:
+//OLED_SDA — GPIO4
+//OLED_SCL — GPIO15
+//OLED_RST — GPIO16
+SSD1306 display(0x3c, 4, 15);
+#endif
+
 #ifdef ENABLE_BLUETOOTH
 #include <BLEDevice.h>
 #include <BLEUtils.h>
@@ -13,6 +23,22 @@
 
 #ifdef ENABLE_OTA
 #include <ArduinoOTA.h>
+#endif
+
+#ifdef ENABLE_LORA
+#include <LoRa.h>
+
+// WIFI_LoRa_32 ports
+// GPIO5 — SX1278’s SCK
+// GPIO19 — SX1278’s MISO
+// GPIO27 — SX1278’s MOSI
+// GPIO18 — SX1278’s CS
+// GPIO14 — SX1278’s RESET
+// GPIO26 — SX1278’s IRQ(Interrupt Request)
+#define SS 18
+#define RST 14
+#define DI0 26
+#define BAND 886E6
 #endif
 
 WiFiClient espClient;
@@ -256,6 +282,15 @@ private:
 BluetoothScanner bluetoothScanner;
 #endif
 
+#ifdef ENABLE_LORA
+void processLoRa() {
+  while (LoRa.available()) {
+    char receivedText = (char)LoRa.read();
+    Serial.print(receivedText);
+  }
+}
+#endif
+
 void connectWifi() {
   if (WiFi.status() == WL_CONNECTED) {
     return;
@@ -274,6 +309,20 @@ void connectWifi() {
 void setup() {
   Serial.begin(115200);
   WiFi.begin(ssid, password);
+
+#ifdef ENABLE_OLED
+  display.init();
+  display.flipScreenVertically();
+  display.setFont(ArialMT_Plain_10);
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.drawString(5, 5, "LoRa Sender");
+  display.display();
+#endif
+
+#ifdef ENABLE_LORA
+  SPI.begin(5, 19, 27, 18);
+  LoRa.setPins(SS, RST, DI0);
+#endif
 
   char hostname[64];
   uint8_t mac[6];
@@ -360,6 +409,14 @@ void setup() {
 #ifdef ENABLE_BLUETOOTH
   FreeRTOS::startTask(BluetoothScanner::scannerTask, "bluetoothScanner", &bluetoothScanner);
 #endif
+
+#ifdef ENABLE_LORA
+  if (!LoRa.begin(BAND)) {
+    Serial.println("Failed to start LoRa\n");
+    ESP.restart();
+    return;
+  }
+#endif
 }
 
 void loop() {
@@ -383,6 +440,10 @@ void loop() {
 
 #ifdef ENABLE_BLUETOOTH
   bluetoothScanner.process();
+#endif
+
+#ifdef ENABLE_LORA
+  processLoRa();
 #endif
 
   delay(5);
