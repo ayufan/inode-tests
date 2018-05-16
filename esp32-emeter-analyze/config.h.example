@@ -1,7 +1,9 @@
 #define ENABLE_BLUETOOTH
-#define ENABLE_LORA
-#define ENABLE_OLED
-#define ENABLE_OTA
+//#define ENABLE_LORA
+//#define ENABLE_OLED
+#define ENABLE_WIFI
+#define ENABLE_WIFI_MQTT
+#define ENABLE_WIFI_OTA
 
 const char *ssid = "MyWiFi";
 const char *password = "MyWiFiPassword";
@@ -14,3 +16,20 @@ const char *mqtt_user = "";
 const char *mqtt_password = "";
 
 const int bluetooth_scan_time = 5;
+
+const int lora_band = 869525e3;
+const int lora_sf = 12;
+const int lora_bw = 500e3;
+const int lora_cr = 1;
+
+const int lora_pin_sck = 5;
+const int lora_pin_miso = 19;
+const int lora_pin_mosi = 27;
+const int lora_pin_ss = 18;
+const int lora_pin_reset = 14;
+const int lora_pin_di0 = 26;
+
+const int oled_address = 0x3c;
+const int oled_pin_sda = 21;
+const int oled_pin_scl = 22;
+const int oled_pin_reset = -1;
