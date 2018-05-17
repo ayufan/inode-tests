@@ -82,6 +82,7 @@ String bytesToString(const unsigned char *data, int size) {
   String output;
   output.reserve(size);
   for (int i = 0; i < size; ++i) {
+    // TODO: this is slow
     output += (char)data[i];
   }
   return output;
@@ -204,7 +205,7 @@ struct deviceData {
     publishMqttInteger(address.c_str(), "weekDay", weekDay, meter->weekDayTotal);
 
 #ifdef ENABLE_OLED
-    lines[iNodeStatus] = String("Emeter ") + address + "(" + rssi + "dBm";
+    lines[iNodeStatus] = String("Emeter ") + address + " (" + rssi + "dBm)";
     lines[iNodeDataStatus] = String("Current: ") + avg + "W; Total: " + sum + "kW/h";
 #endif
 
@@ -334,12 +335,12 @@ static void otaStart() {
     type = "filesystem";
 
   // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
-  Serial.println("Start updating " + type);
+  Serial.println("OTA update: " + type);
 #ifdef ENABLE_BLUETOOTH
   bluetoothScanner.pause();
 #endif
 #ifdef ENABLE_OLED
-  lines[OTAStatus] = String("Starting updating ") + type + "...";
+  lines[OTAStatus] = String("OTA update: ") + type + "...";
 #endif
 }
 
@@ -354,14 +355,14 @@ static void otaEnd() {
 }
 
 static void otaProgress(unsigned int progress, unsigned int total) {
-  Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  Serial.printf("OTA Progress: %u%%\r", (progress / (total / 100)));
 #ifdef ENABLE_OLED
   lines[OTAStatus] = String("OTA Progress: ") + (progress / (total / 100)) + "%";
 #endif
 }
 
 static void otaError(ota_error_t error) {
-  Serial.printf("Error[%u]: ", error);
+  Serial.printf("OTA Error[%u]: ", error);
   if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
   else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
   else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
